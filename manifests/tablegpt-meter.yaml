@@ -1,0 +1,123 @@
+apiVersion: v1
+data:
+  DB_TYPE: redis
+  REDIS_ADDR: redis:6379
+kind: ConfigMap
+metadata:
+  name: tablegpt-meter-env-hdkcc58t4h
+  namespace: kubeflow-zc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: "7"
+  name: redis
+  namespace: kubeflow-zc
+spec:
+  ports:
+    - name: service-port
+      port: 6379
+      protocol: TCP
+      targetPort: 6379
+  selector:
+    app: redis
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: tablegpt-meter
+  name: tablegpt-meter
+  namespace: kubeflow-zc
+spec:
+  ports:
+    - name: http-port
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: grpc-port
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+  selector:
+    app: tablegpt-meter
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: "7"
+  name: redis
+  namespace: kubeflow-zc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: redis
+    spec:
+      containers:
+        - image: redis:7
+          name: redis
+          ports:
+            - containerPort: 6379
+              name: service-port
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tablegpt-meter
+  namespace: kubeflow-zc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tablegpt-meter
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: tablegpt-meter
+    spec:
+      containers:
+        - command:
+            - "./meter"
+            - "--grpc-port=8081"
+            - "--probe-address=:8080"
+          env:
+            - name: HOST
+              value: "::"
+            - name: GRPC_HOST
+              value: "::"
+          envFrom:
+            - configMapRef:
+                name: tablegpt-meter-env-hdkcc58t4h
+          image: weekenthralling/tablegpt-meter:0.0.1
+          imagePullPolicy: IfNotPresent
+          name: tablegpt-meter
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi

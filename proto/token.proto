@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+option go_package = "./token";
+
+package proto;
+
+// TokenService defines the methods for managing tokens.
+service TokenService {
+  // RecordTokenUsage creates a record of token usage for a specific user.
+  rpc RecordTokenUsage(RecordTokenUsageRequest) returns (TokenOperationResponse);
+
+  // UpdateUserTotalTokens updates the total number of tokens for a specific user.
+  rpc UpdateUserTotalTokens(UpdateUserTotalTokensRequest) returns (TokenOperationResponse);
+}
+
+// RecordTokenUsageRequest is used to record token usage for a specific user.
+message RecordTokenUsageRequest {
+  string user_id = 1;     // User ID for which the token usage is recorded.
+  int64 tokens_used = 2;  // Number of tokens used.
+  string domain = 3;      // Domain for which the token usage is recorded.
+}
+
+// UpdateUserTotalTokensRequest is used to update the total number of tokens for a specific user.
+message UpdateUserTotalTokensRequest {
+  string user_id = 1;     // User ID for which the total tokens are updated.
+  string domain = 2;      // Domain for which the total tokens are updated.
+  int64 new_total_tokens = 3; // New total number of tokens for the user.
+}
+
+// TokenOperationResponse is the response message for token operations.
+message TokenOperationResponse {
+  bool success = 1;       // Indicates whether the operation was successful.
+  string message = 2;     // Additional message or error description.
+}

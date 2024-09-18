@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tablegpt-meter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tablegpt-meter
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: tablegpt-meter
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      containers:
+        - image: weekenthralling/tablegpt-meter:latest
+          imagePullPolicy: IfNotPresent
+          name: tablegpt-meter
+          command:
+            - "./meter"
+            - "--grpc-port=8081"
+            - "--probe-address=:8080"
+          envFrom:
+            - configMapRef:
+                name: tablegpt-meter-env
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+          resources:
+            limits:
+              cpu: "1"
+              memory: "2Gi"
