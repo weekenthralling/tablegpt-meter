@@ -135,6 +135,8 @@ func NewRecordHandler(svc token.TokenServiceServer) func(http.ResponseWriter, *h
 			return
 		}
 
+		log.Printf("Received token usage record request: %s, %s, %d",
+			req.Domain, req.UserId, req.TokensUsed)
 		resp, err := svc.RecordTokenUsage(ctx, &req)
 		if err != nil {
 			log.Fatalf("error: %s", err.Error())
