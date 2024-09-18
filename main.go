@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/tablegpt_meter/server"
 	"github.com/tablegpt_meter/store"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
@@ -92,6 +94,11 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
+	http.HandleFunc("/record", func(w http.ResponseWriter, r *http.Request) {
+		handler := NewRecordHandler(tokenServiceServer)
+		handler(w, r) // Call the handler returned from NewRecordHandler
+	})
+
 	// Start the health check server in a new goroutine
 	go func() {
 		log.Printf("Starting health check server on %s", *probeAddr)
@@ -102,5 +109,47 @@ func main() {
 
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
+	}
+}
+
+func writeHttpStatus(writer http.ResponseWriter, code int) {
+	http.Error(writer, http.StatusText(code), code)
+}
+
+func NewRecordHandler(svc token.TokenServiceServer) func(http.ResponseWriter, *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		var req token.RecordTokenUsageRequest
+
+		ctx := context.Background()
+
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			log.Fatalf("error: %s", err.Error())
+			writeHttpStatus(writer, http.StatusBadRequest)
+			return
+		}
+
+		if err := protojson.Unmarshal(body, &req); err != nil {
+			log.Fatalf("error: %s", err.Error())
+			writeHttpStatus(writer, http.StatusBadRequest)
+			return
+		}
+
+		resp, err := svc.RecordTokenUsage(ctx, &req)
+		if err != nil {
+			log.Fatalf("error: %s", err.Error())
+			writeHttpStatus(writer, http.StatusBadRequest)
+			return
+		}
+
+		jsonResp, err := protojson.Marshal(resp)
+		if err != nil {
+			log.Fatalf("error marshaling proto3 to json: %s", err.Error())
+			writeHttpStatus(writer, http.StatusInternalServerError)
+			return
+		}
+
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Write(jsonResp)
 	}
 }
